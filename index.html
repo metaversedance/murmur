@@ -1,0 +1,216 @@
+
+<html>
+  <head>
+<!--     <script src="https://aframe.io/releases/0.5.0/aframe.min.js"></script>
+ -->
+ <script src="js/aframe-v0.7.1.min.js" type="text/javascript"></script>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta http-equiv="content-type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no,user-scalable=no,maximum-scale=1">
+    <title>Examples • Animation</title>
+    <script src="aframe-extras.js"></script>
+    <script src="ecgData.js"></script>
+    <script type="text/javascript">
+      AFRAME.registerComponent("offset-texture-animation", {
+        //Anything in schema can be changed in the visual inspector! CTRL+ATL+i 
+        schema: {
+          "heart-texture": {"type":"string"},
+          "offset-scale": {default: 0.03}
+        },
+        init: function(){
+          var self = this;
+          //Load tree-veins texture to be used on mesh & animated via offset
+          this.texLoader = new THREE.TextureLoader();//
+          // this.heartTex = this.texLoader.load(this.data["heart-texture"]);
+          this.heartTex = this.texLoader.load("textures/spring-tex.jpg");
+          this.heartTexBump = this.texLoader.load("textures/spring-bumpmap.jpg");
+
+
+          //create new THREE.js material. Important to set morphTargets to true!
+          this.material = new THREE.MeshPhongMaterial({
+            morphTargets: true, 
+            map: this.heartTex,
+            bumpMap: this.heartTexBump
+          });
+
+          this.el.addEventListener("model-loaded", function(e){
+            console.log(e)
+            console.log(self.material)
+            e.detail.model.material = self.material;
+          })
+
+        }, //tick function called on each frame, 
+            //arguments: time since initialization, time since last tick
+        tick: function(time,delta) {
+          if(!this.el.object3D.children[0]) return;
+          //Create a sin wave from time, scaled by offset-scale
+          // var offset = Math.sin(time) * this.data["offset-scale"];
+          var offset = Math.sin(time/3000)/100;
+
+          //offset texture x & y
+          this.el.object3D.children[0].material.map.offset.y = offset;
+          this.el.object3D.children[0].material.map.offset.x = offset;
+
+        },
+        update: function(oldData) {
+          if(oldData["heart-texture"] !== this.data["heart-texture"]) {
+            this.heartTex = this.texLoader.load(this.data["heart-texture"]);
+          }
+
+
+        }
+
+      })
+
+      AFRAME.registerComponent("heart-pump-animation",{
+        schema: {
+          heartPumpScalar: {type:"number", default:2},
+          heartFragmentMorphScalar: {type: "number", default: 0},
+          // entityToTrack: {type: "string"},
+
+        },
+        init: function() {
+
+          this.normalize = function(val, max, min) { 
+            return (val - min) / (max - min); 
+          }
+          var self = this;
+          this.normalizeArr = function(array) {
+            var array = new Array(array);
+            var min = Math.min.apply(null,array);
+            var max = Math.max.apply(null,array);
+
+
+
+            return array.map(function(num){
+              return self.normalize(num,.01,1)
+            })
+          }
+          // this.slider = document.getElementById("heart-slider");
+          // this.getSpeed = function(deltaTime,currentPosition, lastPosition) {
+          //     var deltaX = lastPosition.x - currentPosition.x ;
+          //     var deltaY =  lastPosition.y - currentPosition.y ;
+          //     var deltaZ = lastPosition.z - currentPosition.z;
+          //     var distanceTravelled =  Math.sqrt( deltaX*deltaX + deltaY*deltaY + deltaZ*deltaZ)
+          //     var speed = distanceTravelled / deltaTime;
+          //     return speed;
+
+          // }
+          // this.entityToTrack = this.el.sceneEl.querySelector(this.data.entityToTrack);
+          // this.lastObjPosition = this.entityToTrack.getAttribute("position");
+
+
+          // this.ecgData = window.ecgData.filter(function(number){
+          //   return number < .6 && number > -.5;
+
+          // });
+          this.ecgData = window.ecgData.splice(3000,400).map(function(num){
+            return num + .2
+          });
+          window.ecgDataFiltered = this.ecgData;
+          console.log("this.el.object3d",this.el.object3D)
+          this.ecgArrIdx = 0;
+          this.timeCounter = 0;
+
+        },
+        tick: function(time,deltaTime) {
+          this.timeCounter+=deltaTime;
+          // console.log(this.timeCounter)
+          if(this.timeCounter > 40) {
+            this.timeCounter = 0;
+            this.ecgArrIdx++;
+          }
+          if(this.ecgArrIdx === this.ecgData.length) {
+            this.ecgArrIdx = 0;
+          }
+
+
+          if(this.el.object3D.children[0])  {
+            // var currentObjPosition =  this.entityToTrack.getAttribute("position");
+            // var speed = this.getSpeed(deltaTime, currentObjPosition, this.lastObjPosition)
+            var sinWave = Math.sin(time/3000)
+            var heartPumpScalar =  this.data.heartPumpScalar;
+            var heartFragmentMorphValue = this.data.heartFragmentMorphValue;
+            // this.el.object3D.children[0].morphTargetInfluences[1] = this.ecgData[this.ecgArrIdx]*heartPumpScalar;
+                this.el.object3D.children[0].morphTargetInfluences[1] = sinWave+this.ecgData[this.ecgArrIdx] *2 ;
+
+                this.el.object3D.children[0].morphTargetInfluences[2] = this.ecgData[this.ecgArrIdx]*heartPumpScalar;
+                 this.el.object3D.children[0].morphTargetInfluences[3] = -this.ecgData[this.ecgArrIdx]*heartPumpScalar + (sinWave/2) - .5;
+
+            // this.el.object3D.children[0].morphTargetInfluences[3] = parseFloat(this.slider.value/10)
+                // this.el.object3D.children[0].morphTargetInfluences[2] = parseFloat(this.slider.value/100)
+
+
+            // this.lastObjPosition = currentObjPosition;
+
+
+
+          }
+        }
+      })
+      AFRAME.registerComponent("fog-changer", {
+        init: function() {
+          this.slider = document.getElementById("heart-slider");
+
+        },
+        tick: function(time,delta) {
+          var scalar =  parseFloat(this.slider.value)/500;
+          // var density = Math.sin(time/5000);
+          this.el.setAttribute("fog","density",scalar)
+        }
+      })
+    </script>
+  </head>
+  <body>
+    
+<!--     <input type="range" id="heart-slider" value="0" max="100" min="0" style="z-index: 1; position:relative; float: right">
+    <button id="wireframe-bttn" style="position: relative; z-index:1 ; float: right">wireframe</button> -->
+
+<!--     <script>
+  //toggles wireframe of heart
+    var wireframeBttn = document.getElementById("wireframe-bttn")
+
+    wireframeBttn.addEventListener("click", function(){
+      document.getElementById("heart").object3D.children[0].material.materials.forEach(function(material){
+        var wireframeBool = material.wireframe = !material.wireframe;
+
+        wireframeBttn.innerText = "wireframe: " + wireframeBool;
+      })
+    })
+  </script> -->
+  <script type="text/javascript">
+    
+  </script>
+
+
+    <a-scene vr-mode-ui="enabled: false">
+
+    <a-assets>
+      <img id="tree-veins" src="textures/tree-veins.jpg">
+      <a-asset-item id="heart-model" src="heart_deconstructed.json"></a-asset-item>
+    </a-assets>
+      <a-entity id="camera" 
+                camera 
+                position="-10.294 7.885 3.394" 
+                rotation=" -24.809 -68.526 -4.870">
+      </a-entity>
+
+      <!-- Animation
+           See: http://threejs.org/examples/#webgl_animation_scene
+      -->
+<a-entity id="heart" 
+          rotation="-58.213 105.825 9.855" 
+          json-model="src:#heart-model" 
+          position="0 2.538 1" 
+          scale="8.065 3.73 4.829" 
+          heart-pump-animation="heartPumpScalar:8">
+      </a-entity>
+
+
+      <a-light type="ambient" color="#bbb"></a-light>
+      <a-light color="#ccc" position="0 30 0" distance="100" intensity="0.4" type="point"></a-light>
+      <a-light color="#ccc" position="3 10 -10" distance="50" intensity="0.4" type="point"></a-light>
+      <a-sky color="black"></a-sky>
+    </a-scene>
+  </body>
+</html>
